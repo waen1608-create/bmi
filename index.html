@@ -351,14 +351,18 @@
         <span class="material-icons">local_hospital</span> โรคประจำตัว
       </div>
       <hr class="divider" />
-      <div class="chip-group" id="diseases">
-        <button class="chip" data-value="เบาหวาน" onclick="toggleChip(this,'error')">💉 เบาหวาน</button>
-        <button class="chip" data-value="ความดันโลหิตสูง" onclick="toggleChip(this,'error')">❤️‍🩹 ความดันโลหิตสูง</button>
-        <button class="chip" data-value="โรคหัวใจ" onclick="toggleChip(this,'error')">🫀 โรคหัวใจ</button>
-        <button class="chip" data-value="โรคไต" onclick="toggleChip(this,'error')">🫘 โรคไต</button>
-        <button class="chip" data-value="โรคหลอดเลือดสมอง" onclick="toggleChip(this,'error')">🧠 โรคหลอดเลือดสมอง</button>
-        <button class="chip" data-value="มะเร็ง" onclick="toggleChip(this,'error')">🎗️ มะเร็ง</button>
-        <button class="chip" data-value="ไม่มี" onclick="toggleNone(this)">✅ ไม่มี</button>
+      <div class="field" id="f-diseases">
+        <label>เลือกโรคประจำตัว (เลือกได้หลายรายการ กด Ctrl ค้างเพื่อเลือกหลายรายการ)</label>
+        <select id="diseases" multiple size="7" style="padding:10px 14px;border:1.5px solid #bdbdbd;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:1rem;width:100%;outline:none;cursor:pointer;" onfocus="this.style.borderColor='#1565c0';this.style.boxShadow='0 0 0 3px rgba(21,101,192,.15)'" onblur="this.style.borderColor='#bdbdbd';this.style.boxShadow='none'">
+          <option value="เบาหวาน">💉 เบาหวาน</option>
+          <option value="ความดันโลหิตสูง">❤️‍🩹 ความดันโลหิตสูง</option>
+          <option value="โรคหัวใจ">🫀 โรคหัวใจ</option>
+          <option value="โรคไต">🫘 โรคไต</option>
+          <option value="โรคหลอดเลือดสมอง">🧠 โรคหลอดเลือดสมอง</option>
+          <option value="มะเร็ง">🎗️ มะเร็ง</option>
+          <option value="ไม่มี" selected>✅ ไม่มี</option>
+        </select>
+        <div class="helper" style="color:#757575;margin-top:4px"></div>
       </div>
 
       <!-- Buttons -->
@@ -395,15 +399,7 @@
       el.classList.toggle('active-' + type);
     }
 
-    function toggleNone(el) {
-      const group = el.parentElement;
-      const isActive = el.classList.contains('active-error');
-      // deactivate all siblings
-      group.querySelectorAll('.chip').forEach(c => c.classList.remove('active-error'));
-      if (!isActive) el.classList.add('active-error');
-    }
-
-    function getActiveValues(groupId) {
+    function getActiveChips(groupId) {
       const chips = document.querySelectorAll('#' + groupId + ' .chip');
       const vals = [];
       chips.forEach(c => {
@@ -411,6 +407,15 @@
           vals.push(c.dataset.value);
         }
       });
+      return vals;
+    }
+
+    function getSelectedDiseases() {
+      const sel = document.getElementById('diseases');
+      const vals = [];
+      for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].selected) vals.push(sel.options[i].value);
+      }
       return vals;
     }
 
@@ -518,8 +523,8 @@
       const height    = +document.getElementById('height').value;
       const gender    = document.querySelector('input[name="gender"]:checked').value;
 
-      const behaviors = getActiveValues('behaviors');
-      const diseases  = getActiveValues('diseases');
+      const behaviors = getActiveChips('behaviors');
+      const diseases  = getSelectedDiseases();
 
       const bmi    = calcBMI(weight, height);
       const bmiCat = bmiCategory(bmi);
@@ -577,6 +582,11 @@
       document.querySelectorAll('.chip').forEach(c => {
         c.classList.remove('active-warning', 'active-error');
       });
+      // Reset select: deselect all, select "ไม่มี"
+      const sel = document.getElementById('diseases');
+      for (let i = 0; i < sel.options.length; i++) {
+        sel.options[i].selected = (sel.options[i].value === 'ไม่มี');
+      }
       ['f-firstName','f-lastName','f-age','f-weight','f-height','f-gender'].forEach(clearError);
       document.getElementById('formAlert').classList.remove('show');
     }
