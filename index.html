@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ระบบลงทะเบียนและประเมินความเสี่ยงสุขภาพเบื้องต้น</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;700&display=swap" rel="stylesheet" />
+
+  <!-- MUI CSS (Roboto + Icons) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+
+  <!-- React 18 + ReactDOM (UMD) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel standalone for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- MUI 5 (UMD) -->
+  <script crossorigin src="https://unpkg.com/@mui/material@5/umd/material-ui.production.min.js"></script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+      min-height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const {
+      Container, Paper, Grid, Stack, Box, Typography,
+      TextField, Button, RadioGroup, Radio, FormControlLabel, FormControl, FormLabel,
+      Select, MenuItem, InputLabel, FormHelperText,
+      Alert, Dialog, DialogTitle, DialogContent, DialogActions,
+      Chip, Divider, AppBar, Toolbar, IconButton
+    } = MaterialUI;
+
+    // ─── Constants ───
+    const RISK_BEHAVIORS = [
+      'สูบบุหรี่',
+      'ดื่มแอลกอฮอล์เป็นประจำ',
+      'ไม่ออกกำลังกาย',
+      'รับประทานอาหารไม่สมดุล',
+      'เครียดเรื้อรัง'
+    ];
+
+    const CHRONIC_DISEASES = [
+      'เบาหวาน',
+      'ความดันโลหิตสูง',
+      'โรคหัวใจ',
+      'โรคไต',
+      'โรคหลอดเลือดสมอง',
+      'มะเร็ง',
+      'ไม่มี'
+    ];
+
+    // ─── Helpers ───
+    function calcBMI(weightKg, heightCm) {
+      const hm = heightCm / 100;
+      return weightKg / (hm * hm);
+    }
+
+    function bmiCategory(bmi) {
+      if (bmi < 18.5) return { label: 'น้ำหนักต่ำกว่าเกณฑ์', color: 'info' };
+      if (bmi < 23)   return { label: 'น้ำหนักปกติ', color: 'success' };
+      if (bmi < 25)   return { label: 'น้ำหนักเกิน', color: 'warning' };
+      return { label: 'อ้วน', color: 'error' };
+    }
+
+    function assessRisk(bmi, behaviors, diseases) {
+      let score = 0;
+
+      // BMI contribution
+      if (bmi < 18.5 || bmi >= 25) score += 2;
+      else if (bmi >= 23) score += 1;
+
+      // behavior contribution
+      score += behaviors.length;
+
+      // chronic disease contribution
+      const hasChronic = diseases.filter(d => d !== 'ไม่มี').length;
+      score += hasChronic * 2;
+
+      if (score <= 2) return { level: 'Low Risk', label: 'ความเสี่ยงต่ำ', color: '#4caf50', chipColor: 'success' };
+      if (score <= 5) return { level: 'Moderate Risk', label: 'ความเสี่ยงปานกลาง', color: '#ff9800', chipColor: 'warning' };
+      return { level: 'High Risk', label: 'ความเสี่ยงสูง', color: '#f44336', chipColor: 'error' };
+    }
+
+    function getRecommendations(risk, bmiCat, behaviors) {
+      const recs = [];
+      if (risk.level === 'High Risk') {
+        recs.push('⚠️ ควรพบแพทย์เพื่อตรวจสุขภาพอย่างละเอียดโดยเร็ว');
+        recs.push('📋 ควรติดตามค่าสุขภาพเป็นประจำทุก 1-3 เดือน');
+      }
+      if (risk.level === 'Moderate Risk') {
+        recs.push('📋 ควรตรวจสุขภาพประจำปีและปรับเปลี่ยนพฤติกรรม');
+      }
+      if (bmiCat.label === 'อ้วน' || bmiCat.label === 'น้ำหนักเกิน') {
+        recs.push('🏃 ควรออกกำลังกายสม่ำเสมอ อย่างน้อย 150 นาที/สัปดาห์');
+        recs.push('🥗 ควรควบคุมอาหารและลดอาหารที่มีไขมันและน้ำตาลสูง');
+      }
+      if (bmiCat.label === 'น้ำหนักต่ำกว่าเกณฑ์') {
+        recs.push('🍽️ ควรรับประทานอาหารให้ครบ 5 หมู่ เพิ่มปริมาณอาหาร');
+      }
+      if (behaviors.includes('สูบบุหรี่')) {
+        recs.push('🚭 ควรเลิกสูบบุหรี่ หรือเข้าโปรแกรมเลิกบุหรี่');
+      }
+      if (behaviors.includes('ดื่มแอลกอฮอล์เป็นประจำ')) {
+        recs.push('🍷 ควรลดหรือเลิกการดื่มแอลกอฮอล์');
+      }
+      if (behaviors.includes('เครียดเรื้อรัง')) {
+        recs.push('🧘 ควรฝึกจัดการความเครียด เช่น การทำสมาธิ โยคะ');
+      }
+      if (risk.level === 'Low Risk') {
+        recs.push('✅ สุขภาพอยู่ในเกณฑ์ดี ควรรักษาพฤติกรรมที่ดีต่อไป');
+        recs.push('📅 ตรวจสุขภาพประจำปีตามปกติ');
+      }
+      return recs;
+    }
+
+    // ─── App ───
+    function App() {
+      const [form, setForm] = React.useState({
+        firstName: '',
+        lastName: '',
+        age: '',
+        weight: '',
+        height: '',
+        gender: '',
+        behaviors: [],
+        diseases: []
+      });
+
+      const [errors, setErrors] = React.useState({});
+      const [dialogOpen, setDialogOpen] = React.useState(false);
+      const [result, setResult] = React.useState(null);
+
+      const update = (field, value) => {
+        setForm(prev => ({ ...prev, [field]: value }));
+        if (errors[field]) {
+          setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
+        }
+      };
+
+      const toggleBehavior = (b) => {
+        setForm(prev => {
+          const has = prev.behaviors.includes(b);
+          return { ...prev, behaviors: has ? prev.behaviors.filter(x => x !== b) : [...prev.behaviors, b] };
+        });
+      };
+
+      const toggleDisease = (d) => {
+        setForm(prev => {
+          if (d === 'ไม่มี') return { ...prev, diseases: prev.diseases.includes('ไม่มี') ? [] : ['ไม่มี'] };
+          const has = prev.diseases.includes(d);
+          const next = has ? prev.diseases.filter(x => x !== d) : [...prev.diseases.filter(x => x !== 'ไม่มี'), d];
+          return { ...prev, diseases: next };
+        });
+      };
+
+      const validate = () => {
+        const e = {};
+        if (!form.firstName.trim()) e.firstName = 'กรุณากรอกชื่อ';
+        if (!form.lastName.trim()) e.lastName = 'กรุณากรอกนามสกุล';
+        if (!form.age || isNaN(form.age) || +form.age < 1 || +form.age > 150) e.age = 'กรุณากรอกอายุที่ถูกต้อง (1-150)';
+        if (!form.weight || isNaN(form.weight) || +form.weight < 1) e.weight = 'กรุณากรอกน้ำหนักที่ถูกต้อง';
+        if (!form.height || isNaN(form.height) || +form.height < 30) e.height = 'กรุณากรอกส่วนสูงที่ถูกต้อง';
+        if (!form.gender) e.gender = 'กรุณาเลือกเพศ';
+        setErrors(e);
+        return Object.keys(e).length === 0;
+      };
+
+      const handleSubmit = () => {
+        if (!validate()) return;
+        const bmi = calcBMI(+form.weight, +form.height);
+        const bmiCat = bmiCategory(bmi);
+        const risk = assessRisk(bmi, form.behaviors, form.diseases);
+        const recs = getRecommendations(risk, bmiCat, form.behaviors);
+        setResult({ bmi, bmiCat, risk, recs });
+        setDialogOpen(true);
+      };
+
+      const handleReset = () => {
+        setForm({ firstName: '', lastName: '', age: '', weight: '', height: '', gender: '', behaviors: [], diseases: [] });
+        setErrors({});
+        setResult(null);
+      };
+
+      return (
+        <Box>
+          {/* Header */}
+          <AppBar position="static" sx={{ background: 'linear-gradient(90deg, #1565c0, #7b1fa2)', mb: 4 }}>
+            <Toolbar>
+              <span className="material-icons" style={{ marginRight: 12, fontSize: 32 }}>health_and_safety</span>
+              <Box>
+                <Typography variant="h6" fontWeight={700} sx={{ fontFamily: 'Sarabun' }}>
+                  ระบบลงทะเบียนและประเมินความเสี่ยงสุขภาพเบื้องต้น
+                </Typography>
+                <Typography variant="caption" sx={{ opacity: 0.85, fontFamily: 'Sarabun' }}>
+                  Patient Health Risk Assessment and Registration System
+                </Typography>
+              </Box>
+            </Toolbar>
+          </AppBar>
+
+          <Container maxWidth="md" sx={{ pb: 6 }}>
+            <Paper elevation={4} sx={{ p: { xs: 2, sm: 4 }, borderRadius: 3 }}>
+
+              {/* Section 1: Personal Info */}
+              <Typography variant="h6" fontWeight={700} color="primary" gutterBottom sx={{ fontFamily: 'Sarabun' }}>
+                <span className="material-icons" style={{ verticalAlign: 'middle', mr: 1 }}>person</span>
+                {' '}ข้อมูลส่วนบุคคล
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField fullWidth label="ชื่อ" value={form.firstName}
+                    onChange={e => update('firstName', e.target.value)}
+                    error={!!errors.firstName} helperText={errors.firstName} />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField fullWidth label="นามสกุล" value={form.lastName}
+                    onChange={e => update('lastName', e.target.value)}
+                    error={!!errors.lastName} helperText={errors.lastName} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth label="อายุ (ปี)" type="number" value={form.age}
+                    onChange={e => update('age', e.target.value)}
+                    error={!!errors.age} helperText={errors.age} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth label="น้ำหนัก (kg)" type="number" value={form.weight}
+                    onChange={e => update('weight', e.target.value)}
+                    error={!!errors.weight} helperText={errors.weight} />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField fullWidth label="ส่วนสูง (cm)" type="number" value={form.height}
+                    onChange={e => update('height', e.target.value)}
+                    error={!!errors.height} helperText={errors.height} />
+                </Grid>
+                <Grid item xs={12}>
+                  <FormControl error={!!errors.gender}>
+                    <FormLabel sx={{ fontFamily: 'Sarabun' }}>เพศ</FormLabel>
+                    <RadioGroup row value={form.gender} onChange={e => update('gender', e.target.value)}>
+                      <FormControlLabel value="ชาย" control={<Radio />} label="ชาย" />
+                      <FormControlLabel value="หญิง" control={<Radio />} label="หญิง" />
+                      <FormControlLabel value="อื่นๆ" control={<Radio />} label="อื่นๆ" />
+                    </RadioGroup>
+                    {errors.gender && <FormHelperText>{errors.gender}</FormHelperText>}
+                  </FormControl>
+                </Grid>
+              </Grid>
+
+              {/* Section 2: Risk Behaviors */}
+              <Typography variant="h6" fontWeight={700} color="primary" gutterBottom sx={{ mt: 4, fontFamily: 'Sarabun' }}>
+                <span className="material-icons" style={{ verticalAlign: 'middle' }}>warning</span>
+                {' '}พฤติกรรมความเสี่ยง
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {RISK_BEHAVIORS.map(b => (
+                  <Chip
+                    key={b}
+                    label={b}
+                    clickable
+                    color={form.behaviors.includes(b) ? 'warning' : 'default'}
+                    variant={form.behaviors.includes(b) ? 'filled' : 'outlined'}
+                    onClick={() => toggleBehavior(b)}
+                    sx={{ fontFamily: 'Sarabun', mb: 1 }}
+                  />
+                ))}
+              </Stack>
+
+              {/* Section 3: Chronic Diseases */}
+              <Typography variant="h6" fontWeight={700} color="primary" gutterBottom sx={{ mt: 4, fontFamily: 'Sarabun' }}>
+                <span className="material-icons" style={{ verticalAlign: 'middle' }}>local_hospital</span>
+                {' '}โรคประจำตัว
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {CHRONIC_DISEASES.map(d => (
+                  <Chip
+                    key={d}
+                    label={d}
+                    clickable
+                    color={form.diseases.includes(d) ? 'error' : 'default'}
+                    variant={form.diseases.includes(d) ? 'filled' : 'outlined'}
+                    onClick={() => toggleDisease(d)}
+                    sx={{ fontFamily: 'Sarabun', mb: 1 }}
+                  />
+                ))}
+              </Stack>
+
+              {/* Buttons */}
+              <Stack direction="row" spacing={2} sx={{ mt: 4 }} justifyContent="center">
+                <Button variant="contained" size="large" onClick={handleSubmit}
+                  sx={{ px: 5, fontFamily: 'Sarabun', fontWeight: 700, borderRadius: 2,
+                        background: 'linear-gradient(90deg, #1565c0, #7b1fa2)' }}>
+                  <span className="material-icons" style={{ marginRight: 8 }}>assessment</span>
+                  ประเมินผล
+                </Button>
+                <Button variant="outlined" size="large" onClick={handleReset}
+                  sx={{ px: 5, fontFamily: 'Sarabun', fontWeight: 700, borderRadius: 2 }}>
+                  <span className="material-icons" style={{ marginRight: 8 }}>refresh</span>
+                  ล้างข้อมูล
+                </Button>
+              </Stack>
+            </Paper>
+
+            {/* Footer */}
+            <Typography variant="body2" align="center" sx={{ mt: 3, opacity: 0.6, fontFamily: 'Sarabun' }}>
+              © 2026 Patient Health Risk Assessment System — งานที่ 1
+            </Typography>
+          </Container>
+
+          {/* Result Dialog */}
+          {result && (
+            <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+              <DialogTitle sx={{ fontFamily: 'Sarabun', fontWeight: 700,
+                background: 'linear-gradient(90deg, #1565c0, #7b1fa2)', color: '#fff' }}>
+                <span className="material-icons" style={{ verticalAlign: 'middle', marginRight: 8 }}>summarize</span>
+                สรุปผลการประเมิน
+              </DialogTitle>
+              <DialogContent sx={{ pt: 3 }}>
+                <Stack spacing={2} sx={{ mt: 1 }}>
+                  {/* Patient Info */}
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ fontFamily: 'Sarabun' }}>ข้อมูลผู้ป่วย</Typography>
+                    <Typography sx={{ fontFamily: 'Sarabun' }}>
+                      {form.firstName} {form.lastName} | เพศ: {form.gender} | อายุ: {form.age} ปี
+                    </Typography>
+                    <Typography sx={{ fontFamily: 'Sarabun' }}>
+                      น้ำหนัก: {form.weight} kg | ส่วนสูง: {form.height} cm
+                    </Typography>
+                  </Paper>
+
+                  {/* BMI */}
+                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ fontFamily: 'Sarabun' }}>ค่า BMI</Typography>
+                    <Typography variant="h3" fontWeight={700} sx={{ color: result.risk.color, fontFamily: 'Sarabun' }}>
+                      {result.bmi.toFixed(1)}
+                    </Typography>
+                    <Chip label={result.bmiCat.label} color={result.bmiCat.color} sx={{ mt: 1, fontFamily: 'Sarabun' }} />
+                  </Paper>
+
+                  {/* Risk Level */}
+                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center',
+                    borderColor: result.risk.color, borderWidth: 2 }}>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ fontFamily: 'Sarabun' }}>ระดับความเสี่ยง</Typography>
+                    <Chip
+                      label={`${result.risk.label} (${result.risk.level})`}
+                      color={result.risk.chipColor}
+                      sx={{ mt: 1, fontSize: 16, fontWeight: 700, py: 2, px: 1, fontFamily: 'Sarabun' }}
+                    />
+                  </Paper>
+
+                  {/* Recommendations */}
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ fontFamily: 'Sarabun' }}>
+                      คำแนะนำ
+                    </Typography>
+                    {result.recs.map((r, i) => (
+                      <Alert key={i} severity="info" sx={{ mb: 1, fontFamily: 'Sarabun' }}>{r}</Alert>
+                    ))}
+                  </Paper>
+                </Stack>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setDialogOpen(false)} sx={{ fontFamily: 'Sarabun' }}>ปิด</Button>
+                <Button variant="contained" onClick={() => { setDialogOpen(false); handleReset(); }}
+                  sx={{ fontFamily: 'Sarabun' }}>
+                  ประเมินใหม่
+                </Button>
+              </DialogActions>
+            </Dialog>
+          )}
+        </Box>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
